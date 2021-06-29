@@ -469,8 +469,8 @@ class GnomeModule(ExtensionModule):
             girtarget = girtarget.held_object
 
         if not isinstance(girtarget, (build.Executable, build.SharedLibrary,
-                                      build.StaticLibrary)):
-            raise MesonException('Gir target must be an executable or library')
+                                      build.StaticLibrary, build.CustomTarget)):
+            raise MesonException('Gir target must be an executable or library not {}'.format(girtarget))
 
         STATIC_BUILD_REQUIRED_VERSION = ">=1.58.1"
         if isinstance(girtarget, (build.StaticLibrary)) and \
@@ -616,15 +616,11 @@ class GnomeModule(ExtensionModule):
                 # Because of https://gitlab.gnome.org/GNOME/gobject-introspection/merge_requests/72
                 # we can't use the full path until this is merged.
                 libpath = os.path.join(girtarget.get_subdir(), girtarget.get_filename())
-                if isinstance(girtarget, build.SharedLibrary):
-                    # need to put our output directory first as we need to use the
-                    # generated libraries instead of any possibly installed system/prefix
-                    # ones.
-                    ret += ["-L@BUILD_ROOT@/{}".format(os.path.dirname(libpath))]
-                    libname = girtarget.get_basename()
-                else:
-                    libname = os.path.join(f"@BUILD_ROOT@/{libpath}")
-                ret += ['--library', libname]
+                # need to put our output directory first as we need to use the
+                # generated libraries instead of any possibly installed system/prefix
+                # ones.
+                ret += ["-L@BUILD_ROOT@/{}".format(os.path.dirname(libpath))]
+                ret += ['--library', girtarget.get_basename()]
                 # Needed for the following binutils bug:
                 # https://github.com/mesonbuild/meson/issues/1911
                 # However, g-ir-scanner does not understand -Wl,-rpath
@@ -632,12 +628,15 @@ class GnomeModule(ExtensionModule):
                 for d in state.backend.determine_rpath_dirs(girtarget):
                     d = os.path.join(state.environment.get_build_dir(), d)
                     ret.append('-L' + d)
-
         return ret
 
     def _get_girtargets_langs_compilers(self, girtargets: T.List[GirTarget]) -> T.List[T.Tuple[str, 'Compiler']]:
         ret: T.List[T.Tuple[str, 'Compiler']] = []
+
         for girtarget in girtargets:
+            if not hasattr(girtarget, 'compilers'):
+                continue
+
             for lang, compiler in girtarget.compilers.items():
                 # XXX: Can you use g-i with any other language?
                 if lang in ('c', 'cpp', 'objc', 'objcpp', 'd'):
@@ -650,12 +649,16 @@ class GnomeModule(ExtensionModule):
         ret = []
         for girtarget in girtargets:
             ret += girtarget.get_all_link_deps()
+            if not hasattr(girtarget, 'get_external_deps'):
+                continue
             ret += girtarget.get_external_deps()
         return ret
 
     def _get_gir_targets_inc_dirs(self, girtargets):
         ret = []
         for girtarget in girtargets:
+            if not hasattr(girtarget, 'get_include_dirs'):
+                continue
             ret += girtarget.get_include_dirs()
         return ret
 

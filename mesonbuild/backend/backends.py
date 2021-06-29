@@ -602,6 +602,10 @@ class Backend:
 
     def rpaths_for_bundled_shared_libraries(self, target, exclude_system=True):
         paths = []
+
+        if not hasattr(target, 'external_deps'):
+            return paths
+
         for dep in target.external_deps:
             if not isinstance(dep, (dependencies.ExternalLibrary, dependencies.PkgConfigDependency)):
                 continue
@@ -636,7 +640,8 @@ class Backend:
             result = OrderedSet()
             result.add('meson-out')
         result.update(self.rpaths_for_bundled_shared_libraries(target))
-        target.rpath_dirs_to_remove.update([d.encode('utf-8') for d in result])
+        if hasattr(target, 'rpath_dirs_to_remove'):
+            target.rpath_dirs_to_remove.update([d.encode('utf-8') for d in result])
         return tuple(result)
 
     @staticmethod
