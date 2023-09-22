@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import PurePath
+import itertools
 import os
 import typing as T
 
@@ -154,6 +155,15 @@ class DependenciesHelper:
                 pass
             elif isinstance(obj, dependencies.ExternalDependency) and obj.name == 'threads':
                 pass
+            elif isinstance(obj, dependencies.InternalDependency) and (obj.libraries or obj.whole_libraries):
+                for lib in itertools.chain(obj.libraries, obj.whole_libraries):
+                    if lib.get_id() in self.metadata:
+                        self._check_generated_pc_deprecation(lib)
+                        processed_reqs.append(self.metadata[lib.get_id()].filebase)
+                    else:
+                        raise mesonlib.MesonException('requires argument not a string, '
+                                                      'library with pkgconfig-generated file '
+                                                      f'or pkgconfig-dependency object, got {obj!r}')
             else:
                 raise mesonlib.MesonException('requires argument not a string, '
                                               'library with pkgconfig-generated file '
